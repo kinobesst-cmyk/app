@@ -58,6 +58,18 @@ def send_signal_with_chart(symbol, df, side, entry, tp, sl, level):
 # --- ТА САМАЯ МАТЕМАТИКА ИЗ ТЕСТОВ ---
 def breaker_logic():
     print(">>> ПУШКА ЗАРЯЖЕНА: СКАНЕР ЗАПУЩЕН")
+
+    # ПРЯМАЯ ПРОВЕРКА СВЯЗИ
+    print(f"📡 Пробую отправить тестовое SMS в Telegram (ID: {CHAT_ID})...")
+    try:
+        url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
+        test_res = requests.post(url, json={'chat_id': CHAT_ID, 'text': "🚀 Бот на связи и видит рынок!"}, timeout=10)
+        if test_res.status_code == 200:
+            print("✅ ТЕЛЕГРАМ ОТВЕТИЛ: Сообщение доставлено!")
+        else:
+            print(f"❌ ТЕЛЕГРАМ ОШИБКА: {test_res.status_code} - {test_res.text}")
+    except Exception as e:
+        print(f"❌ КРИТИЧЕСКАЯ ОШИБКА СВЯЗИ: {e}")
     
     while True:
         print(f"\n--- НОВЫЙ КРУГ ПРОВЕРКИ: {time.strftime('%H:%M:%S')} ---")
