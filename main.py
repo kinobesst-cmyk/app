@@ -67,6 +67,7 @@ def send_signal_with_chart(symbol, df, side, entry, tp, sl, level):
 
 # --- ГЛАВНАЯ ЛОГИКА РАЗРУШИТЕЛЯ ---
 def breaker_logic():
+    requests.get(f"https://api.telegram.org/bot{TOKEN}/sendMessage?chat_id={CHAT_ID}&text=🚀 Разрушитель Уровней успешно запущен и сканирует рынок!")
     while True:
         for symbol in SYMBOLS:
             try:
