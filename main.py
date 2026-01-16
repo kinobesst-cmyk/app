@@ -57,11 +57,11 @@ def send_signal_with_chart(symbol, df, side, entry, tp, sl, level):
         f"💵 ВХОД: {entry:.4f}\n\n"
         f"🎯 ТЕЙК: {tp:.4f}\n"
         f"🛑 СТОП: {sl:.4f}\n\n"
-        f"🔗 [Открыть график на Binance](https://www.binance.com/en/trade/{symbol.replace('USDT', '_USDT')})"
+        f"🔗 Binance: https://www.binance.com/en/trade/{symbol.replace('USDT', '_USDT')}"
     )
 
     # Отправка фото в Telegram
-    url = f"https://api.telegram.org/bot{TOKEN}/sendPhoto?chat_id={CHAT_ID}&caption={message}&parse_mode=Markdown"
+    url = f"https://api.telegram.org/bot{TOKEN}/sendPhoto?chat_id={CHAT_ID}&caption={message}"
     with open(img_path, 'rb') as photo:
         requests.post(url, files={'photo': photo})
     
