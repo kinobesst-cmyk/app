@@ -73,7 +73,7 @@ def send_signal_with_chart(symbol, df, side, entry, tp, sl, level):
 def breaker_logic():
     print(">>> ЗАПУСКАЮ ЦИКЛ СКАНЕРА...") # Это мы увидим в логах
     try:
-        url = f"https://api.telegram.org/bot{TOKEN}/sendMessage?chat_id={CHAT_ID}&text=ТЕСТ"
+        url = f"https://api.telegram.org/bot{TOKEN}/sendMessage?chat_id={CHAT_ID}&text=Работаем👨🏻‍🔧"
         r = requests.get(url, timeout=10)
         # ЭТА СТРОКА СКАЖЕТ ПРАВДУ:
         print(f">>> ОТВЕТ ТГ: {r.json()}")
