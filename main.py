@@ -83,47 +83,43 @@ def breaker_logic():
     
     while True:
         for symbol in SYMBOLS:
-            print(f">>> Проверяю {symbol}...") # Добавь эту строку
+            # 1. Сразу пишем в консоль, что начали проверку
+            print(f">>> Проверяю {symbol}...") 
+            
             try:
-                # Твой остальной код...
-                if пробой:
-                    print(f"!!! НАЙДЕН СИГНАЛ ПО {symbol} !!!")
-            current_time = time.time()
-            if current_time - last_signals.get(symbol, 0) < 600:
-                continue
-            try:
-                # Берем 5-минутные свечи
+                # 2. Проверяем, не спамим ли (пауза 10 мин)
+                current_time = time.time()
+                if current_time - last_signals.get(symbol, 0) < 600:
+                    continue 
+
+                # 3. Получаем данные (это должно быть ВНУТРИ цикла)
                 klines = client.get_klines(symbol=symbol, interval='5m', limit=50)
                 df = pd.DataFrame(klines, columns=['t','o','h','l','c','v','ct','q','n','v_b','q_b','i'])
                 df['c'] = df['c'].astype(float)
                 
-                # Определяем границы за последние 2 часа (24 свечи)
                 high_level = df['c'].iloc[-25:-2].max()
                 low_level = df['c'].iloc[-25:-2].min()
-                
-                current_price = df['c'].iloc[-1]  # Текущая свеча (подтверждение)
-                prev_price = df['c'].iloc[-2]     # Свеча пробоя
-                
-                # --- ЛОГИКА LONG (ВВЕРХ) ---
-                if prev_price > high_level and current_price > high_level:
-                    # Стоп чуть ниже уровня, Тейк с запасом 1.2%
-                    sl = high_level * 0.998
-                    tp = current_price * 1.012
-                    send_signal_with_chart(symbol, df, "BUY", current_price, tp, sl, high_level)
-                    last_signals[symbol] = time.time()  # ДОБАВЬ ЭТУ СТРОКУ (вместо sleep)
+                current_price = df['c'].iloc[-1]
+                prev_price = df['c'].iloc[-2]
 
-                # --- ЛОГИКА SHORT (ВНИЗ) ---
+                # 4. Проверяем пробой
+                if prev_price > high_level and current_price > high_level:
+                    print(f"!!! СИГНАЛ BUY: {symbol} !!!")
+                    sl, tp = high_level * 0.998, current_price * 1.012
+                    send_signal_with_chart(symbol, df, "BUY", current_price, tp, sl, high_level)
+                    last_signals[symbol] = current_time
+
                 elif prev_price < low_level and current_price < low_level:
-                    # Стоп чуть выше уровня, Тейк 1.2% вниз
-                    sl = low_level * 1.002
-                    tp = current_price * 0.988
+                    print(f"!!! СИГНАЛ SELL: {symbol} !!!")
+                    sl, tp = low_level * 1.002, current_price * 0.988
                     send_signal_with_chart(symbol, df, "SELL", current_price, tp, sl, low_level)
-                    last_signals[symbol] = time.time()  # ДОБАВЬ ЭТУ СТРОКУ (вместо sleep)
+                    last_signals[symbol] = current_time
 
             except Exception as e:
-                print(f"Ошибка по {symbol}: {e}")
+                print(f"❌ Ошибка по {symbol}: {e}")
         
-        time.sleep(15) # Проверка раз в минуту
+        print(">>> Круг завершен, жду 20 секунд...")
+        time.sleep(20)
 
 # Запуск бота в отдельном потоке
 threading.Thread(target=breaker_logic, daemon=True).start()
