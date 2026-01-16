@@ -76,10 +76,10 @@ def breaker_logic():
         # ЭТА СТРОКА СКАЖЕТ ПРАВДУ:
         print(f">>> ОТВЕТ ТГ: {r.json()}")
         
-    except Exception as e:
+  except Exception as e:
         print(f">>> ОШИБКА ПРИВЕТСТВИЯ: {e}")
     
-    while True:
+     while True:
         for symbol in SYMBOLS:
             try:
                 # Берем 5-минутные свечи
