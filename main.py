@@ -54,7 +54,7 @@ def send_signal_with_chart(symbol, df, side, entry, tp, sl, level):
             f"ВХОД: {entry:.4f}\n\n"
             f"🎯 ТЕЙК: {tp:.4f}\n"
             f"🛑 СТОП: {sl:.4f}\n\n"
-            f"🔗 График: https://www.binance.com/en/trade/{symbol.replace('USDT', '_USDT')}"
+            f"🔗 Фьючерсы: https://www.binance.com/en/futures/{symbol}"
         )
 
         url = f"https://api.telegram.org/bot{TOKEN}/sendPhoto?chat_id={CHAT_ID}&caption={message}"
