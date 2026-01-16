@@ -1,4 +1,6 @@
 import os
+import sys
+sys.stdout.reconfigure(line_buffering=True)
 import time
 import requests
 import threading
@@ -67,7 +69,14 @@ def send_signal_with_chart(symbol, df, side, entry, tp, sl, level):
 
 # --- ГЛАВНАЯ ЛОГИКА РАЗРУШИТЕЛЯ ---
 def breaker_logic():
-    requests.get(f"https://api.telegram.org/bot{TOKEN}/sendMessage?chat_id={CHAT_ID}&text=🚀 Разрушитель Уровней успешно запущен и сканирует рынок!")
+    print(">>> ЗАПУСКАЮ ЦИКЛ СКАНЕРА...") # Это мы увидим в логах
+    try:
+        url = f"https://api.telegram.org/bot{TOKEN}/sendMessage?chat_id={CHAT_ID}&text=🚀 Разрушитель запущен!"
+        requests.get(url, timeout=10)
+        print(">>> ПРИВЕТСТВИЕ ОТПРАВЛЕНО В ТГ")
+    except Exception as e:
+        print(f">>> ОШИБКА ПРИВЕТСТВИЯ: {e}")
+    
     while True:
         for symbol in SYMBOLS:
             try:
