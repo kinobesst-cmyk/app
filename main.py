@@ -55,8 +55,7 @@ def send_signal_with_chart(symbol, df, side, entry, tp, sl, level):
         f"💵 **ВХОД: {entry:.4f}**\n\n"
         f"🎯 **ТЕЙК: {tp:.4f}**\n"
         f"🛑 **СТОП: {sl:.4f}**\n\n"
-        f"🔗 [Торговать на Binance](https://www.binance.com/ru/trade/{symbol.replace('USDT', '_USDT')})"
-    )
+        f"🔗 [Торговать на Binance](https://www.binance.com/ru/trade/{symbol.replace('USDT', '_USDT')})")
 
     # Отправка фото в Telegram
     url = f"https://api.telegram.org/bot{TOKEN}/sendPhoto?chat_id={CHAT_ID}&caption={message}&parse_mode=Markdown"
@@ -71,7 +70,7 @@ def send_signal_with_chart(symbol, df, side, entry, tp, sl, level):
 def breaker_logic():
     print(">>> ЗАПУСКАЮ ЦИКЛ СКАНЕРА...") # Это мы увидим в логах
     try:
-      url = f"https://api.telegram.org/bot{TOKEN}/sendMessage?chat_id={CHAT_ID}&text=ТЕСТ"
+        url = f"https://api.telegram.org/bot{TOKEN}/sendMessage?chat_id={CHAT_ID}&text=ТЕСТ"
         r = requests.get(url, timeout=10)
         # ЭТА СТРОКА СКАЖЕТ ПРАВДУ:
         print(f">>> ОТВЕТ ТГ: {r.json()}")
