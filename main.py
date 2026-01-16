@@ -76,76 +76,135 @@ def send_signal_with_chart(symbol, df, side, entry, tp, sl, level):
     except Exception as e:
         print(f"❌ Ошибка в блоке отправки {symbol}: {e}")
 
-# --- ГЛАВНАЯ ЛОГИКА ---
+import os
+import sys
+import time
+import requests
+import threading
+import pandas as pd
+import pandas_ta as ta
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+from binance.client import Client
+from flask import Flask
+
+# Настройка вывода логов
+sys.stdout.reconfigure(line_buffering=True)
+
+# --- ИНИЦИАЛИЗАЦИЯ ---
+TOKEN = os.environ.get("TELEGRAM_TOKEN")
+CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
+client = Client("", "") # Вставь ключи или оставь пустыми для публичных данных
+
+SYMBOLS = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'XRPUSDT', 'ADAUSDT', 'DOGEUSDT', 'AVAXUSDT', 'DOTUSDT', 'TRXUSDT', 'LINKUSDT', 'NEARUSDT']
+last_signals = {} 
+app = Flask(__name__)
+
+@app.route('/')
+def health_check():
+    return "BOT IS ALIVE", 200
+
+# --- ФУНКЦИЯ ОТРИСОВКИ ---
+def send_signal_with_chart(symbol, df, side, entry, tp, sl, level):
+    try:
+        plt.clf()
+        plt.figure(figsize=(10, 6))
+        prices = df['c'].tail(30).values
+        plt.plot(prices, label='Цена', color='dodgerblue', linewidth=2)
+        plt.axhline(y=level, color='orange', linestyle='--', label='Уровень')
+        plt.axhline(y=tp, color='limegreen', linestyle='-', linewidth=2, label='TP')
+        plt.axhline(y=sl, color='crimson', linestyle='-', linewidth=2, label='SL')
+        
+        img_path = f'sig_{symbol}.png'
+        plt.savefig(img_path)
+        plt.close('all')
+
+        direction = "🚀 *LONG (BUY)*" if side == "BUY" else "🔻 *SHORT (SELL)*"
+        message = (
+            f"{direction}\n"
+            f"🪙 Монета: *{symbol}*\n"
+            f"📊 Уровень: `{level:.4f}`\n"
+            f"🎯 **ВХОД**: `{entry:.4f}`\n\n"
+            f"💰 **TP**: `{tp:.4f}`\n"
+            f"🛑 **SL**: `{sl:.4f}`\n\n"
+            f"🔗 [ОТКРЫТЬ ФЬЮЧЕРСЫ](https://www.binance.com/en/futures/{symbol})"
+        )
+
+        url = f"https://api.telegram.org/bot{TOKEN}/sendPhoto"
+        with open(img_path, 'rb') as photo:
+            payload = {'chat_id': CHAT_ID, 'caption': message, 'parse_mode': 'Markdown'}
+            requests.post(url, data=payload, files={'photo': photo}, timeout=15)
+
+        if os.path.exists(img_path):
+            os.remove(img_path)
+    except Exception as e:
+        print(f"❌ Ошибка отправки {symbol}: {e}")
+
 # --- ГЛАВНАЯ ЛОГИКА ---
 def breaker_logic():
-    print(">>> ЗАПУСКАЮ ЦИКЛ СКАНЕРА...")
+    print(">>> СКАНЕР ЗАПУЩЕН...")
     try:
-        requests.get(f"https://api.telegram.org/bot{TOKEN}/sendMessage?chat_id={CHAT_ID}&text=Работаем 👨🏻‍🔧")
-    except:
-        pass
+        requests.get(f"https://api.telegram.org/bot{TOKEN}/sendMessage?chat_id={CHAT_ID}&text=Бот запущен. Стратегия: ATR + ADX + Trend 1H")
+    except: pass
     
     while True:
         for symbol in SYMBOLS:
             try:
                 current_time = time.time()
-                # Проверка тайм-аута (10 минут)
                 if current_time - last_signals.get(symbol, 0) < 600:
                     continue 
 
-                print(f">>> Проверяю {symbol}...") 
-
-                klines = client.get_klines(symbol=symbol, interval='5m', limit=100) 
+                # Данные 5м
+                klines = client.get_klines(symbol=symbol, interval='5m', limit=100)
                 df = pd.DataFrame(klines, columns=['t','o','h','l','c','v','ct','q','n','v_b','q_b','i'])
-                df['c'] = df['c'].astype(float)
-                df['v'] = df['v'].astype(float)
-                
-                # --- ИНДИКАТОРЫ ---
-                ema200 = ta.ema(df['c'], length=50) 
-                rsi = ta.rsi(df['c'], length=14)
-                
-                current_rsi = rsi.iloc[-1]
-                current_ema = ema200.iloc[-1]
-                # ------------------
+                df[['h','l','c','v']] = df[['h','l','c','v']].astype(float)
 
-                high_level = df['c'].iloc[-25:-2].max()
-                low_level = df['c'].iloc[-25:-2].min()
+                # Данные 1ч для тренда
+                klines_1h = client.get_klines(symbol=symbol, interval='1h', limit=210)
+                df_1h = pd.DataFrame(klines_1h, columns=['t','o','h','l','c','v','ct','q','n','v_b','q_b','i'])
+                df_1h['c'] = df_1h['c'].astype(float)
+
+                # Индикаторы
+                rsi = ta.rsi(df['c'], length=14).iloc[-1]
+                adx_df = ta.adx(df['h'], df['l'], df['c'], length=14)
+                current_adx = adx_df['ADX_14'].iloc[-1]
+                current_atr = ta.atr(df['h'], df['l'], df['c'], length=14).iloc[-1]
+                ema_1h = ta.ema(df_1h['c'], length=200).iloc[-1]
+                
                 current_price = df['c'].iloc[-1]
                 prev_price = df['c'].iloc[-2]
-
+                high_level = df['c'].iloc[-25:-2].max()
+                low_level = df['c'].iloc[-25:-2].min()
+                
                 avg_volume = df['v'].iloc[-21:-1].mean()
-                current_volume = df['v'].iloc[-1]
-                vol_ratio = current_volume / avg_volume if avg_volume > 0 else 0
+                vol_ratio = df['v'].iloc[-1] / avg_volume if avg_volume > 0 else 0
 
-                limit_buy = high_level * 1.005
-                limit_sell = low_level * 0.995
-
-                # 4. УСЛОВИЯ
-                if prev_price < low_level and current_price < low_level and vol_ratio > 1.5:
-                    if current_price >= limit_sell and current_price < current_ema and current_rsi > 35:
-                        print(f"🔥 ПОДТВЕРЖДЕННЫЙ SELL: {symbol} (RSI: {current_rsi:.2f})")
-                        sl, tp = low_level * 1.002, current_price * 0.988
-                        threading.Thread(target=send_signal_with_chart, args=(symbol, df, "SELL", current_price, tp, sl, low_level)).start()
-                        last_signals[symbol] = current_time
-                    else:
-                        print(f"❌ Фильтр отклонил SELL {symbol}: RSI {current_rsi:.1f}")
-
-                elif prev_price > high_level and current_price > high_level and vol_ratio > 1.5:
-                    if current_price <= limit_buy and current_price > current_ema and current_rsi < 65:
-                        print(f"🔥 ПОДТВЕРЖДЕННЫЙ BUY: {symbol} (RSI: {current_rsi:.2f})")
-                        sl, tp = high_level * 0.998, current_price * 1.012
+                # ЛОГИКА BUY
+                if prev_price > high_level and current_price > high_level and vol_ratio > 1.5:
+                    if current_price > ema_1h and current_adx > 25 and rsi < 70:
+                        sl = current_price - (current_atr * 2.5)
+                        tp = current_price + (current_atr * 5)
                         threading.Thread(target=send_signal_with_chart, args=(symbol, df, "BUY", current_price, tp, sl, high_level)).start()
                         last_signals[symbol] = current_time
-                    else:
-                        print(f"❌ Фильтр отклонил BUY {symbol}: RSI {current_rsi:.1f}")
+                        print(f"✅ Сигнал BUY по {symbol}")
+
+                # ЛОГИКА SELL
+                elif prev_price < low_level and current_price < low_level and vol_ratio > 1.5:
+                    if current_price < ema_1h and current_adx > 25 and rsi > 30:
+                        sl = current_price + (current_atr * 2.5)
+                        tp = current_price - (current_atr * 5)
+                        threading.Thread(target=send_signal_with_chart, args=(symbol, df, "SELL", current_price, tp, sl, low_level)).start()
+                        last_signals[symbol] = current_time
+                        print(f"✅ Сигнал SELL по {symbol}")
 
             except Exception as e:
-                print(f"❌ Ошибка по {symbol}: {e}")
+                print(f"❌ Ошибка {symbol}: {e}")
         
-        time.sleep(10)
+        time.sleep(15)
 
-threading.Thread(target=breaker_logic, daemon=True).start()
-
+# --- СТАРТ ---
 if __name__ == "__main__":
+    threading.Thread(target=breaker_logic, daemon=True).start()
     port = int(os.environ.get("PORT", 8080))
     app.run(host='0.0.0.0', port=port)
