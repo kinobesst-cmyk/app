@@ -65,29 +65,31 @@ def send_signal_with_chart(symbol, df, side, entry, tp, sl, level):
 
 # --- ГЛАВНАЯ ЛОГИКА ---
 def breaker_logic():
-    print(">>> СКАНЕР ЗАПУЩЕН...")
+    print(">>> [СТАРТ] Сканер запущен и ожидает сигналов...")
     try:
-        requests.get(f"https://api.telegram.org/bot{TOKEN}/sendMessage?chat_id={CHAT_ID}&text=Бот запущен. Стратегия: ATR + ADX + Trend 1H")
-    except: pass
+        requests.get(f"https://api.telegram.org/bot{TOKEN}/sendMessage?chat_id={CHAT_ID}&text=Бот запущен. Логи включены.")
+    except Exception as e:
+        print(f">>> [ОШИБКА] Не удалось отправить приветствие в ТГ: {e}")
     
     while True:
+        print(f"\n>>> [ЦИКЛ] Проверка рынка: {time.strftime('%H:%M:%S')}")
         for symbol in SYMBOLS:
             try:
                 current_time = time.time()
                 if current_time - last_signals.get(symbol, 0) < 600:
                     continue 
 
-                # Данные 5м
+                # Лог проверки каждой монеты
+                print(f"  > Проверяю {symbol}...", end="\r")
+
                 klines = client.get_klines(symbol=symbol, interval='5m', limit=100)
                 df = pd.DataFrame(klines, columns=['t','o','h','l','c','v','ct','q','n','v_b','q_b','i'])
                 df[['h','l','c','v']] = df[['h','l','c','v']].astype(float)
 
-                # Данные 1ч для тренда
                 klines_1h = client.get_klines(symbol=symbol, interval='1h', limit=210)
                 df_1h = pd.DataFrame(klines_1h, columns=['t','o','h','l','c','v','ct','q','n','v_b','q_b','i'])
                 df_1h['c'] = df_1h['c'].astype(float)
 
-                # Индикаторы
                 rsi = ta.rsi(df['c'], length=14).iloc[-1]
                 adx_df = ta.adx(df['h'], df['l'], df['c'], length=14)
                 current_adx = adx_df['ADX_14'].iloc[-1]
@@ -102,28 +104,27 @@ def breaker_logic():
                 avg_volume = df['v'].iloc[-21:-1].mean()
                 vol_ratio = df['v'].iloc[-1] / avg_volume if avg_volume > 0 else 0
 
-                # ЛОГИКА BUY
                 if prev_price > high_level and current_price > high_level and vol_ratio > 1.5:
                     if current_price > ema_1h and current_adx > 25 and rsi < 70:
+                        print(f"\n🔥 [СИГНАЛ BUY] {symbol} | Цена: {current_price} | ADX: {current_adx:.2f}")
                         sl = current_price - (current_atr * 2.5)
                         tp = current_price + (current_atr * 5)
                         threading.Thread(target=send_signal_with_chart, args=(symbol, df, "BUY", current_price, tp, sl, high_level)).start()
                         last_signals[symbol] = current_time
-                        print(f"✅ Сигнал BUY по {symbol}")
 
-                # ЛОГИКА SELL
                 elif prev_price < low_level and current_price < low_level and vol_ratio > 1.5:
                     if current_price < ema_1h and current_adx > 25 and rsi > 30:
+                        print(f"\n🔥 [СИГНАЛ SELL] {symbol} | Цена: {current_price} | ADX: {current_adx:.2f}")
                         sl = current_price + (current_atr * 2.5)
                         tp = current_price - (current_atr * 5)
                         threading.Thread(target=send_signal_with_chart, args=(symbol, df, "SELL", current_price, tp, sl, low_level)).start()
                         last_signals[symbol] = current_time
-                        print(f"✅ Сигнал SELL по {symbol}")
 
             except Exception as e:
-                print(f"❌ Ошибка {symbol}: {e}")
+                print(f"\n❌ [ОШИБКА {symbol}]: {e}")
         
-        time.sleep(15)
+        print(f"\n>>> [ОЖИДАНИЕ] Жду 10 секунд...")
+        time.sleep(10)
 
 # --- СТАРТ ---
 if __name__ == "__main__":
