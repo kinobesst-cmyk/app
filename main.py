@@ -18,8 +18,8 @@ CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 client = Client("", "") 
 
 # Список монет, за которыми следим
-SYMBOLS = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'ADAUSDT', 'XRPUSDT', 'LINKUSDT']
-
+symbols = ['BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'SOL/USDT', 'XRP/USDT', 'ADA/USDT', 'DOGE/USDT', 'AVAX/USDT', 'DOT/USDT', 'TRX/USDT', 'LINK/USDT', 'NEAR/USDT']
+last_signals = {}  # Тут бот будет хранить время последнего сигнала по каждой монете
 app = Flask(__name__)
 
 @app.route('/')
@@ -83,6 +83,9 @@ def breaker_logic():
     
     while True:
         for symbol in SYMBOLS:
+            current_time = time.time()
+            if current_time - last_signals.get(symbol, 0) < 600:
+                continue
             try:
                 # Берем 5-минутные свечи
                 klines = client.get_klines(symbol=symbol, interval='5m', limit=50)
@@ -102,7 +105,7 @@ def breaker_logic():
                     sl = high_level * 0.998
                     tp = current_price * 1.012
                     send_signal_with_chart(symbol, df, "BUY", current_price, tp, sl, high_level)
-                    time.sleep(600) # Пауза 10 мин, чтобы не спамить одной монетой
+                    last_signals[symbol] = time.time()  # ДОБАВЬ ЭТУ СТРОКУ (вместо sleep)
 
                 # --- ЛОГИКА SHORT (ВНИЗ) ---
                 elif prev_price < low_level and current_price < low_level:
@@ -110,12 +113,12 @@ def breaker_logic():
                     sl = low_level * 1.002
                     tp = current_price * 0.988
                     send_signal_with_chart(symbol, df, "SELL", current_price, tp, sl, low_level)
-                    time.sleep(600)
+                    last_signals[symbol] = time.time()  # ДОБАВЬ ЭТУ СТРОКУ (вместо sleep)
 
             except Exception as e:
                 print(f"Ошибка по {symbol}: {e}")
         
-        time.sleep(60) # Проверка раз в минуту
+        time.sleep(15) # Проверка раз в минуту
 
 # Запуск бота в отдельном потоке
 threading.Thread(target=breaker_logic, daemon=True).start()
