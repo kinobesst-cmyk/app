@@ -77,6 +77,7 @@ def send_signal_with_chart(symbol, df, side, entry, tp, sl, level):
         print(f"❌ Ошибка в блоке отправки {symbol}: {e}")
 
 # --- ГЛАВНАЯ ЛОГИКА ---
+# --- ГЛАВНАЯ ЛОГИКА ---
 def breaker_logic():
     print(">>> ЗАПУСКАЮ ЦИКЛ СКАНЕРА...")
     try:
@@ -85,21 +86,22 @@ def breaker_logic():
         pass
     
     while True:
-      for symbol in SYMBOLS:
-      try:
-         current_time = time.time()
-      if current_time - last_signals.get(symbol, 0) < 600:
-      continue 
+        for symbol in SYMBOLS:
+            try:
+                current_time = time.time()
+                # Проверка тайм-аута (10 минут)
+                if current_time - last_signals.get(symbol, 0) < 600:
+                    continue 
 
                 print(f">>> Проверяю {symbol}...") 
 
-                klines = client.get_klines(symbol=symbol, interval='5m', limit=100) # Взяли 100 свечей для EMA
+                klines = client.get_klines(symbol=symbol, interval='5m', limit=100) 
                 df = pd.DataFrame(klines, columns=['t','o','h','l','c','v','ct','q','n','v_b','q_b','i'])
                 df['c'] = df['c'].astype(float)
                 df['v'] = df['v'].astype(float)
                 
                 # --- ИНДИКАТОРЫ ---
-                ema200 = ta.ema(df['c'], length=50) # Для 5м лучше взять 50 или 100, чтобы быстрее реагировал
+                ema200 = ta.ema(df['c'], length=50) 
                 rsi = ta.rsi(df['c'], length=14)
                 
                 current_rsi = rsi.iloc[-1]
@@ -118,8 +120,7 @@ def breaker_logic():
                 limit_buy = high_level * 1.005
                 limit_sell = low_level * 0.995
 
-                # 4. УСЛОВИЯ С ЖЕСТКИМ ФИЛЬТРОМ
-                # Шортим только если: пробой уровня + объем + цена ниже EMA + RSI еще не в полу
+                # 4. УСЛОВИЯ
                 if prev_price < low_level and current_price < low_level and vol_ratio > 1.5:
                     if current_price >= limit_sell and current_price < current_ema and current_rsi > 35:
                         print(f"🔥 ПОДТВЕРЖДЕННЫЙ SELL: {symbol} (RSI: {current_rsi:.2f})")
@@ -127,9 +128,8 @@ def breaker_logic():
                         threading.Thread(target=send_signal_with_chart, args=(symbol, df, "SELL", current_price, tp, sl, low_level)).start()
                         last_signals[symbol] = current_time
                     else:
-                        print(f"❌ Фильтр отклонил SELL {symbol}: RSI {current_rsi:.1f}, Price vs EMA")
+                        print(f"❌ Фильтр отклонил SELL {symbol}: RSI {current_rsi:.1f}")
 
-                # Покупаем только если: пробой уровня + объем + цена выше EMA + RSI еще не в потолке
                 elif prev_price > high_level and current_price > high_level and vol_ratio > 1.5:
                     if current_price <= limit_buy and current_price > current_ema and current_rsi < 65:
                         print(f"🔥 ПОДТВЕРЖДЕННЫЙ BUY: {symbol} (RSI: {current_rsi:.2f})")
@@ -137,12 +137,12 @@ def breaker_logic():
                         threading.Thread(target=send_signal_with_chart, args=(symbol, df, "BUY", current_price, tp, sl, high_level)).start()
                         last_signals[symbol] = current_time
                     else:
-                        print(f"❌ Фильтр отклонил BUY {symbol}: RSI {current_rsi:.1f}, Price vs EMA")
+                        print(f"❌ Фильтр отклонил BUY {symbol}: RSI {current_rsi:.1f}")
 
             except Exception as e:
                 print(f"❌ Ошибка по {symbol}: {e}")
         
-        time.sleep(10) # Оптимальная пауза между кругами
+        time.sleep(10)
 
 threading.Thread(target=breaker_logic, daemon=True).start()
 
