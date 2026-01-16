@@ -77,7 +77,7 @@ def breaker_logic():
         print(f"❌ Ошибка связи с Telegram: {e}")
     while True:
         for symbol in SYMBOLS:
-    try:
+        try:
                 # 1. Загрузка данных (5-минутки)
                 klines = client.get_klines(symbol=symbol, interval='5m', limit=300)
                 df = pd.DataFrame(klines, columns=['t','o','h','l','c','v','ct','q','n','v_b','q_b','i'])
