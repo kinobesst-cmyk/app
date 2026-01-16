@@ -47,15 +47,18 @@ def send_signal_with_chart(symbol, df, side, entry, tp, sl, level):
     plt.close()
 
     # Текст сообщения
-    direction = "🚀 **ПОКУПКА (LONG)**" if side == "BUY" else "🔻 **ПРОДАЖА (SHORT)**"
+   # Текст сообщения (исправленная версия)
+    direction = "🚀 LONG (ПОКУПКА)" if side == "BUY" else "🔻 SHORT (ПРОДАЖА)"
+    
     message = (
         f"{direction}\n"
-        f"🪙 Монета: #{symbol}\n"
-        f"📊 Пробит уровень: {level:.4f}\n"
-        f"💵 **ВХОД: {entry:.4f}**\n\n"
-        f"🎯 **ТЕЙК: {tp:.4f}**\n"
-        f"🛑 **СТОП: {sl:.4f}**\n\n"
-        f"🔗 [Торговать на Binance](https://www.binance.com/ru/trade/{symbol.replace('USDT', '_USDT')})")
+        f"🪙 Монета: {symbol}\n"
+        f"📊 Уровень: {level:.4f}\n"
+        f"💵 ВХОД: {entry:.4f}\n\n"
+        f"🎯 ТЕЙК: {tp:.4f}\n"
+        f"🛑 СТОП: {sl:.4f}\n\n"
+        f"🔗 [Открыть график на Binance](https://www.binance.com/en/trade/{symbol.replace('USDT', '_USDT')})"
+    )
 
     # Отправка фото в Telegram
     url = f"https://api.telegram.org/bot{TOKEN}/sendPhoto?chat_id={CHAT_ID}&caption={message}&parse_mode=Markdown"
