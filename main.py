@@ -59,8 +59,11 @@ def send_signal_with_chart(symbol, df, side, entry, tp, sl, level):
 def breaker_logic():
     print(">>> ПУШКА ЗАРЯЖЕНА: СКАНЕР ЗАПУЩЕН")
     while True:
+        print(f">>> Запуск цикла проверки: {time.strftime('%H:%M:%S')}") # Добавь этот принт!
         for symbol in SYMBOLS:
-            try:
+            try: # ТЕПЕРЬ С ОТСТУПОМ
+                klines = client.get_klines(symbol=symbol, interval='5m', limit=100)
+                # ... весь остальной код внутри try тоже должен иметь +1 отступ ...
                 # 1. Данные 5м
                 klines = client.get_klines(symbol=symbol, interval='5m', limit=100)
                 df = pd.DataFrame(klines, columns=['t','o','h','l','c','v','ct','q','n','v_b','q_b','i'])
