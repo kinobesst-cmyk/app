@@ -123,7 +123,7 @@ def breaker_logic():
             except Exception as e:
                 print(f"❌ Ошибка {symbol}: {e}")
         
-        time.sleep(10)
+        time.sleep(15)
 
 # --- СТАРТ ---
 if __name__ == "__main__":
