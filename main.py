@@ -93,26 +93,38 @@ def breaker_logic():
 
                 print(f">>> Проверяю {symbol}...") 
 
+                # 2. Получение данных (50 свечей по 5 минут)
                 klines = client.get_klines(symbol=symbol, interval='5m', limit=50)
                 df = pd.DataFrame(klines, columns=['t','o','h','l','c','v','ct','q','n','v_b','q_b','i'])
                 df['c'] = df['c'].astype(float)
+                df['v'] = df['v'].astype(float) # Работаем с объемом
                 
+                # 3. Расчет уровней и Индикатора Объема
                 high_level = df['c'].iloc[-25:-2].max()
                 low_level = df['c'].iloc[-25:-2].min()
                 current_price = df['c'].iloc[-1]
                 prev_price = df['c'].iloc[-2]
 
-                if prev_price > high_level and current_price > high_level:
-                    print(f"!!! СИГНАЛ BUY: {symbol} !!!")
+                # Средний объем за предыдущие 20 свечей (исключая текущую)
+                avg_volume = df['v'].iloc[-21:-1].mean()
+                current_volume = df['v'].iloc[-1]
+                # Во сколько раз текущий объем выше среднего
+                vol_ratio = current_volume / avg_volume if avg_volume > 0 else 0
+
+                # 4. Условия пробоя с подтверждением объема
+                if prev_price > high_level and current_price > high_level and vol_ratio > 1.5:
+                    print(f"!!! СИЛЬНЫЙ СИГНАЛ BUY: {symbol} (Vol x{vol_ratio:.2f}) !!!")
                     sl, tp = high_level * 0.998, current_price * 1.012
-                    # ЗАПУСК ОТПРАВКИ В ФОНЕ (Thread)
+                    
+                    # Запуск отправки в фоновом потоке
                     threading.Thread(target=send_signal_with_chart, args=(symbol, df, "BUY", current_price, tp, sl, high_level)).start()
                     last_signals[symbol] = current_time
 
-                elif prev_price < low_level and current_price < low_level:
-                    print(f"!!! СИГНАЛ SELL: {symbol} !!!")
+                elif prev_price < low_level and current_price < low_level and vol_ratio > 1.5:
+                    print(f"!!! СИЛЬНЫЙ СИГНАЛ SELL: {symbol} (Vol x{vol_ratio:.2f}) !!!")
                     sl, tp = low_level * 1.002, current_price * 0.988
-                    # ЗАПУСК ОТПРАВКИ В ФОНЕ (Thread)
+                    
+                    # Запуск отправки в фоновом потоке
                     threading.Thread(target=send_signal_with_chart, args=(symbol, df, "SELL", current_price, tp, sl, low_level)).start()
                     last_signals[symbol] = current_time
 
