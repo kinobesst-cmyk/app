@@ -58,18 +58,21 @@ def send_signal_with_chart(symbol, df, side, entry, tp, sl, level):
 # --- ТА САМАЯ МАТЕМАТИКА ИЗ ТЕСТОВ ---
 def breaker_logic():
     print(">>> ПУШКА ЗАРЯЖЕНА: СКАНЕР ЗАПУЩЕН")
+    
     while True:
-        print(f">>> Запуск цикла проверки: {time.strftime('%H:%M:%S')}") # Добавь этот принт!
+        print(f"\n--- НОВЫЙ КРУГ ПРОВЕРКИ: {time.strftime('%H:%M:%S')} ---")
         for symbol in SYMBOLS:
-            try: # ТЕПЕРЬ С ОТСТУПОМ
-                klines = client.get_klines(symbol=symbol, interval='5m', limit=100)
-                # ... весь остальной код внутри try тоже должен иметь +1 отступ ...
-                # 1. Данные 5м
-                klines = client.get_klines(symbol=symbol, interval='5m', limit=100)
+            try:
+                # 1. Загрузка данных
+                klines = client.get_klines(symbol=symbol, interval='5m', limit=150) # Увеличил лимит для EMA
+                if len(klines) < 100:
+                    print(f"❌ {symbol}: Мало данных ({len(klines)})")
+                    continue
+                
                 df = pd.DataFrame(klines, columns=['t','o','h','l','c','v','ct','q','n','v_b','q_b','i'])
                 df[['h','l','c','v']] = df[['h','l','c','v']].astype(float)
 
-                # 2. Индикаторы (ИДЕНТИЧНО ТЕСТУ)
+                # 2. Индикаторы
                 ema = df['c'].ewm(span=200, adjust=False).mean().iloc[-1]
                 
                 # ATR
@@ -85,35 +88,37 @@ def breaker_logic():
                 
                 # ADX
                 up, down = df['h'].diff(), df['l'].diff().shift(-1)
-                p_di = 100 * (pd.Series(np.where(up > 0, up, 0)).rolling(14).mean() / tr.rolling(14).mean())
-                m_di = 100 * (pd.Series(np.where(down > 0, down, 0)).rolling(14).mean() / tr.rolling(14).mean())
+                tr_roll = tr.rolling(14).mean()
+                p_di = 100 * (pd.Series(np.where(up > 0, up, 0)).rolling(14).mean() / tr_roll)
+                m_di = 100 * (pd.Series(np.where(down > 0, down, 0)).rolling(14).mean() / tr_roll)
                 adx = (100 * (abs(p_di - m_di) / (p_di + m_di).replace(0, 0.1))).rolling(14).mean().iloc[-1]
 
-                # 3. Условия входа (ИДЕНТИЧНО ТЕСТУ)
+                # 3. Логика входа
                 high_25 = df['c'].iloc[-26:-2].max()
                 low_25 = df['c'].iloc[-26:-2].min()
                 curr_c = df['c'].iloc[-1]
-                
-                # ПРАВИЛЬНЫЙ ОБЪЕМ: Текущий V / Средний V
                 vol_ratio = df['v'].iloc[-1] / df['v'].iloc[-21:-1].mean()
 
-                # LONG
-                if curr_c > high_25 and vol_ratio > 2.0 and rsi < 60 and adx > 20:
-                    if curr_c > ema * 1.002:
-                        sl, tp = curr_c - (atr * 1.8), curr_c + (atr * 1.2)
-                        if time.time() - last_signals.get(symbol, 0) > 1800:
-                            threading.Thread(target=send_signal_with_chart, args=(symbol, df, "BUY", curr_c, tp, sl, high_25)).start()
-                            last_signals[symbol] = time.time()
+                # ОТЛАДКА: Пишем в консоль состояние каждой монеты (потом удалим)
+                print(f"🧐 {symbol} | Цена: {curr_c:.4f} | Vol: {vol_ratio:.1f} | RSI: {rsi:.1f} | ADX: {adx:.1f}")
 
-                # SHORT
-                elif curr_c < low_25 and vol_ratio > 2.0 and rsi > 40 and adx > 20:
-                    if curr_c < ema * 0.998:
-                        sl, tp = curr_c + (atr * 1.8), curr_c - (atr * 1.2)
-                        if time.time() - last_signals.get(symbol, 0) > 1800:
-                            threading.Thread(target=send_signal_with_chart, args=(symbol, df, "SELL", curr_c, tp, sl, low_25)).start()
-                            last_signals[symbol] = time.time()
+                if curr_c > high_25 and vol_ratio > 2.0 and rsi < 60 and adx > 20 and curr_c > ema * 1.002:
+                    print(f"🎯 СИГНАЛ BUY НА {symbol}!")
+                    sl, tp = curr_c - (atr * 1.8), curr_c + (atr * 1.2)
+                    if time.time() - last_signals.get(symbol, 0) > 1800:
+                        threading.Thread(target=send_signal_with_chart, args=(symbol, df, "BUY", curr_c, tp, sl, high_25)).start()
+                        last_signals[symbol] = time.time()
 
-            except Exception as e: print(f"Ошибка {symbol}: {e}")
+                elif curr_c < low_25 and vol_ratio > 2.0 and rsi > 40 and adx > 20 and curr_c < ema * 0.998:
+                    print(f"🎯 СИГНАЛ SELL НА {symbol}!")
+                    sl, tp = curr_c + (atr * 1.8), curr_c - (atr * 1.2)
+                    if time.time() - last_signals.get(symbol, 0) > 1800:
+                        threading.Thread(target=send_signal_with_chart, args=(symbol, df, "SELL", curr_c, tp, sl, low_25)).start()
+                        last_signals[symbol] = time.time()
+
+            except Exception as e:
+                print(f"⚠ Ошибка {symbol}: {str(e)}")
+        
         time.sleep(20)
 
 if __name__ == "__main__":
