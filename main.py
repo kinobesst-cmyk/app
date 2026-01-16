@@ -18,7 +18,7 @@ CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 client = Client("", "") 
 
 # Список монет, за которыми следим
-symbols = ['BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'SOL/USDT', 'XRP/USDT', 'ADA/USDT', 'DOGE/USDT', 'AVAX/USDT', 'DOT/USDT', 'TRX/USDT', 'LINK/USDT', 'NEAR/USDT']
+SYMBOLS = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'XRPUSDT', 'ADAUSDT', 'DOGEUSDT', 'AVAXUSDT', 'DOTUSDT', 'TRXUSDT', 'LINKUSDT', 'NEARUSDT']
 last_signals = {}  # Тут бот будет хранить время последнего сигнала по каждой монете
 app = Flask(__name__)
 
