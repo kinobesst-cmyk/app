@@ -42,7 +42,7 @@ def send_signal_with_chart(symbol, df, side, entry, tp, sl, level):
         plt.savefig(img_path)
         plt.close('all')
 
-        direction = "🚀 *LONG (BUY)*" if side == "BUY" else "🔻 *SHORT (SELL)*"
+       direction = "🚀 *LONG (BUY)*" if side == "BUY" else "🔻 *SHORT (SELL)*"
         message = (
             f"{direction}\n"
             f"🪙 Монета: *{symbol}*\n"
