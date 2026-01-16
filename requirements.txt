@@ -1,5 +1,5 @@
-ccxt
-pyTelegramBotAPI
+python-binance
 pandas
-numpy
+pandas_ta
 matplotlib
+flask
