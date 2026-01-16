@@ -4,6 +4,7 @@ import time
 import requests
 import threading
 import pandas as pd
+import numpy as np        # <--- ВОТ ЭТОЙ СТРОКИ НЕ ХВАТАЛО
 import pandas_ta as ta
 import matplotlib
 matplotlib.use('Agg')
