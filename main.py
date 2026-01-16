@@ -48,16 +48,16 @@ def send_signal_with_chart(symbol, df, side, entry, tp, sl, level):
 
     # Текст сообщения
    # Текст сообщения (исправленная версия)
-    direction = "🚀 LONG (ПОКУПКА)" if side == "BUY" else "🔻 SHORT (ПРОДАЖА)"
+    direction = "LONG (ПОКУПКА)" if side == "BUY" else "SHORT (ПРОДАЖА)"
     
     message = (
         f"{direction}\n"
-        f"🪙 Монета: {symbol}\n"
-        f"📊 Уровень: {level:.4f}\n"
-        f"💵 ВХОД: {entry:.4f}\n\n"
-        f"🎯 ТЕЙК: {tp:.4f}\n"
-        f"🛑 СТОП: {sl:.4f}\n\n"
-        f"🔗 Binance: https://www.binance.com/en/trade/{symbol.replace('USDT', '_USDT')}"
+        f"Монета: {symbol}\n"
+        f"Уровень: {level:.4f}\n"
+        f"ВХОД: {entry:.4f}\n\n"
+        f"ТЕЙК: {tp:.4f}\n"
+        f"СТОП: {sl:.4f}\n\n"
+        f"График: https://www.binance.com/en/trade/{symbol.replace('USDT', '_USDT')}"
     )
 
     # Отправка фото в Telegram
@@ -83,6 +83,11 @@ def breaker_logic():
     
     while True:
         for symbol in SYMBOLS:
+            print(f">>> Проверяю {symbol}...") # Добавь эту строку
+            try:
+                # Твой остальной код...
+                if пробой:
+                    print(f"!!! НАЙДЕН СИГНАЛ ПО {symbol} !!!")
             current_time = time.time()
             if current_time - last_signals.get(symbol, 0) < 600:
                 continue
