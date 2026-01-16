@@ -87,46 +87,57 @@ def breaker_logic():
     while True:
         for symbol in SYMBOLS:
             try:
-                current_time = time.time()
+               current_time = time.time()
                 if current_time - last_signals.get(symbol, 0) < 600:
                     continue 
 
                 print(f">>> Проверяю {symbol}...") 
 
-                # 2. Получение данных (50 свечей по 5 минут)
-                klines = client.get_klines(symbol=symbol, interval='5m', limit=50)
+                klines = client.get_klines(symbol=symbol, interval='5m', limit=100) # Взяли 100 свечей для EMA
                 df = pd.DataFrame(klines, columns=['t','o','h','l','c','v','ct','q','n','v_b','q_b','i'])
                 df['c'] = df['c'].astype(float)
-                df['v'] = df['v'].astype(float) # Работаем с объемом
+                df['v'] = df['v'].astype(float)
                 
-                # 3. Расчет уровней и Индикатора Объема
+                # --- ИНДИКАТОРЫ ---
+                ema200 = ta.ema(df['c'], length=50) # Для 5м лучше взять 50 или 100, чтобы быстрее реагировал
+                rsi = ta.rsi(df['c'], length=14)
+                
+                current_rsi = rsi.iloc[-1]
+                current_ema = ema200.iloc[-1]
+                # ------------------
+
                 high_level = df['c'].iloc[-25:-2].max()
                 low_level = df['c'].iloc[-25:-2].min()
                 current_price = df['c'].iloc[-1]
                 prev_price = df['c'].iloc[-2]
 
-                # Средний объем за предыдущие 20 свечей (исключая текущую)
                 avg_volume = df['v'].iloc[-21:-1].mean()
                 current_volume = df['v'].iloc[-1]
-                # Во сколько раз текущий объем выше среднего
                 vol_ratio = current_volume / avg_volume if avg_volume > 0 else 0
 
-                # 4. Условия пробоя с подтверждением объема
-                if prev_price > high_level and current_price > high_level and vol_ratio > 1.5:
-                    print(f"!!! СИЛЬНЫЙ СИГНАЛ BUY: {symbol} (Vol x{vol_ratio:.2f}) !!!")
-                    sl, tp = high_level * 0.998, current_price * 1.012
-                    
-                    # Запуск отправки в фоновом потоке
-                    threading.Thread(target=send_signal_with_chart, args=(symbol, df, "BUY", current_price, tp, sl, high_level)).start()
-                    last_signals[symbol] = current_time
+                limit_buy = high_level * 1.005
+                limit_sell = low_level * 0.995
 
-                elif prev_price < low_level and current_price < low_level and vol_ratio > 1.5:
-                    print(f"!!! СИЛЬНЫЙ СИГНАЛ SELL: {symbol} (Vol x{vol_ratio:.2f}) !!!")
-                    sl, tp = low_level * 1.002, current_price * 0.988
-                    
-                    # Запуск отправки в фоновом потоке
-                    threading.Thread(target=send_signal_with_chart, args=(symbol, df, "SELL", current_price, tp, sl, low_level)).start()
-                    last_signals[symbol] = current_time
+                # 4. УСЛОВИЯ С ЖЕСТКИМ ФИЛЬТРОМ
+                # Шортим только если: пробой уровня + объем + цена ниже EMA + RSI еще не в полу
+                if prev_price < low_level and current_price < low_level and vol_ratio > 1.5:
+                    if current_price >= limit_sell and current_price < current_ema and current_rsi > 35:
+                        print(f"🔥 ПОДТВЕРЖДЕННЫЙ SELL: {symbol} (RSI: {current_rsi:.2f})")
+                        sl, tp = low_level * 1.002, current_price * 0.988
+                        threading.Thread(target=send_signal_with_chart, args=(symbol, df, "SELL", current_price, tp, sl, low_level)).start()
+                        last_signals[symbol] = current_time
+                    else:
+                        print(f"❌ Фильтр отклонил SELL {symbol}: RSI {current_rsi:.1f}, Price vs EMA")
+
+                # Покупаем только если: пробой уровня + объем + цена выше EMA + RSI еще не в потолке
+                elif prev_price > high_level and current_price > high_level and vol_ratio > 1.5:
+                    if current_price <= limit_buy and current_price > current_ema and current_rsi < 65:
+                        print(f"🔥 ПОДТВЕРЖДЕННЫЙ BUY: {symbol} (RSI: {current_rsi:.2f})")
+                        sl, tp = high_level * 0.998, current_price * 1.012
+                        threading.Thread(target=send_signal_with_chart, args=(symbol, df, "BUY", current_price, tp, sl, high_level)).start()
+                        last_signals[symbol] = current_time
+                    else:
+                        print(f"❌ Фильтр отклонил BUY {symbol}: RSI {current_rsi:.1f}, Price vs EMA")
 
             except Exception as e:
                 print(f"❌ Ошибка по {symbol}: {e}")
