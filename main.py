@@ -30,43 +30,51 @@ def health_check():
 # --- ФУНКЦИЯ ОТРИСОВКИ И ОТПРАВКИ (Теперь работает быстро) ---
 def send_signal_with_chart(symbol, df, side, entry, tp, sl, level):
     try:
+        # 1. Рисуем график
+        plt.clf()
         plt.figure(figsize=(10, 6))
         prices = df['c'].tail(30).values
         plt.plot(prices, label='Цена', color='dodgerblue', linewidth=2)
+        plt.axhline(y=level, color='orange', linestyle='--', label='Уровень')
+        plt.axhline(y=tp, color='limegreen', linestyle='-', linewidth=2, label='TP')
+        plt.axhline(y=sl, color='crimson', linestyle='-', linewidth=2, label='SL')
         
-        plt.axhline(y=level, color='orange', linestyle='--', label='Уровень пробоя')
-        plt.axhline(y=tp, color='limegreen', linestyle='-', linewidth=2, label='ТЕЙК (Профит)')
-        plt.axhline(y=sl, color='crimson', linestyle='-', linewidth=2, label='СТОП (Убыток)')
-        
-        plt.title(f"СИГНАЛ: {symbol} | {side}")
-        plt.legend(loc='upper left')
-        plt.grid(alpha=0.3)
-        
-        img_path = f'signal_{symbol}.png'
+        img_path = f'sig_{symbol}.png'
         plt.savefig(img_path)
-        plt.close('all') # ОЧИСТКА ПАМЯТИ
+        plt.close('all')
 
-        direction = "🚀 LONG (ПОКУПКА)" if side == "BUY" else "🔻 SHORT (ПРОДАЖА)"
+        # 2. Оформляем текст (Markdown: `текст` делает его копируемым)
+        direction = "🚀 *LONG (ПОКУПКА)*" if side == "BUY" else "🔻 *SHORT (ПРОДАЖА)*"
+        
+        # Эмодзи как на твоем примере для удобства
         message = (
             f"{direction}\n"
-            f"Монета: {symbol}\n"
-            f"Уровень: {level:.4f}\n"
-            f"ВХОД: {entry:.4f}\n\n"
-            f"🎯 ТЕЙК: {tp:.4f}\n"
-            f"🛑 СТОП: {sl:.4f}\n\n"
-            f"🔗 Фьючерсы: https://www.binance.com/en/futures/{symbol}"
+            f"🪙 Монета: *{symbol}*\n"
+            f"📊 Уровень: `{level:.4f}`\n"
+            f"🎯 **ВХОД**: `{entry:.4f}`\n\n"
+            f"💰 **TP**: `{tp:.4f}`\n"
+            f"🛑 **SL**: `{sl:.4f}`\n\n"
+            f"🔗 [ОТКРЫТЬ ФЬЮЧЕРСЫ](https://www.binance.com/en/futures/{symbol})"
         )
 
-        url = f"https://api.telegram.org/bot{TOKEN}/sendPhoto?chat_id={CHAT_ID}&caption={message}"
-        with open(img_path, 'rb') as photo:
-            r = requests.post(url, files={'photo': photo})
-            print(f">>> Отправка {symbol} в ТГ: {r.status_code}")
+        # 3. Отправка через правильный метод (чтобы Markdown не ломался)
+        url = f"https://api.telegram.org/bot{TOKEN}/sendPhoto"
         
+        with open(img_path, 'rb') as photo:
+            payload = {
+                'chat_id': CHAT_ID,
+                'caption': message,
+                'parse_mode': 'Markdown' # Используем Markdown для простоты и красоты
+            }
+            r = requests.post(url, data=payload, files={'photo': photo}, timeout=15)
+            print(f">>> Сигнал {symbol} отправлен. Статус: {r.status_code}")
+
+        # 4. Удаляем временный файл
         if os.path.exists(img_path):
-            os.remove(img_path) # УДАЛЕНИЕ ФАЙЛА
-            
+            os.remove(img_path)
+
     except Exception as e:
-        print(f"❌ Ошибка в отправке графика {symbol}: {e}")
+        print(f"❌ Ошибка в блоке отправки {symbol}: {e}")
 
 # --- ГЛАВНАЯ ЛОГИКА ---
 def breaker_logic():
