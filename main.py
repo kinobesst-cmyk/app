@@ -69,9 +69,15 @@ def send_signal_with_chart(symbol, df, side, entry, tp, sl, level):
 # --- ГЛАВНАЯ ЛОГИКА ---
 def breaker_logic():
     print(">>> ПУШКА ЗАРЯЖЕНА: СКАНЕР ЗАПУЩЕН")
+    try:
+        test_url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
+        requests.post(test_url, json={'chat_id': CHAT_ID, 'text': "🚀 Бот запущен на Koyeb и начинает сканирование!"}, timeout=10)
+        print("✅ Тестовое сообщение отправлено в Telegram")
+    except Exception as e:
+        print(f"❌ Ошибка связи с Telegram: {e}")
     while True:
         for symbol in SYMBOLS:
-            try:
+    try:
                 # 1. Загрузка данных (5-минутки)
                 klines = client.get_klines(symbol=symbol, interval='5m', limit=300)
                 df = pd.DataFrame(klines, columns=['t','o','h','l','c','v','ct','q','n','v_b','q_b','i'])
