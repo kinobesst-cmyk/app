@@ -67,65 +67,62 @@ def send_signal_with_chart(symbol, df, side, entry, tp, sl, level):
 
 # --- ГЛАВНАЯ ЛОГИКА ---
 def breaker_logic():
-    print(">>> СКАНЕР ЗАПУЩЕН И РАБОТАЕТ")
-    try:
-        requests.get(f"https://api.telegram.org/bot{TOKEN}/sendMessage?chat_id={CHAT_ID}&text=Бот запущен. Логирование и копирование включено.")
-    except: pass
-    
+    print(">>> ПУШКА ЗАРЯЖЕНА: СКАНЕР ЗАПУЩЕН")
     while True:
         for symbol in SYMBOLS:
             try:
-                current_time = time.time()
-                if current_time - last_signals.get(symbol, 0) < 600:
-                    continue 
-
-                print(f"   > Проверяю {symbol}...") # ЛОГ
-
-                klines = client.get_klines(symbol=symbol, interval='5m', limit=100)
+                # 1. Загрузка данных (5-минутки)
+                klines = client.get_klines(symbol=symbol, interval='5m', limit=300)
                 df = pd.DataFrame(klines, columns=['t','o','h','l','c','v','ct','q','n','v_b','q_b','i'])
                 df[['h','l','c','v']] = df[['h','l','c','v']].astype(float)
 
-                klines_1h = client.get_klines(symbol=symbol, interval='1h', limit=210)
-                df_1h = pd.DataFrame(klines_1h, columns=['t','o','h','l','c','v','ct','q','n','v_b','q_b','i'])
-                df_1h['c'] = df_1h['c'].astype(float)
-
-                rsi = ta.rsi(df['c'], length=14).iloc[-1]
-                adx_df = ta.adx(df['h'], df['l'], df['c'], length=14)
-                current_adx = adx_df['ADX_14'].iloc[-1]
-                current_atr = ta.atr(df['h'], df['l'], df['c'], length=14).iloc[-1]
-                ema_1h = ta.ema(df_1h['c'], length=200).iloc[-1]
+                # 2. Математика индикаторов (Те самые настройки)
+                ema = df['c'].ewm(span=200, adjust=False).mean().iloc[-1]
                 
-                current_price = df['c'].iloc[-1]
-                prev_price = df['c'].iloc[-2]
-                high_level = df['c'].iloc[-25:-2].max()
-                low_level = df['c'].iloc[-25:-2].min()
+                # ATR для динамических стопов
+                hl, hc, lc = df['h']-df['l'], (df['h']-df['c'].shift()).abs(), (df['l']-df['c'].shift()).abs()
+                tr = pd.concat([hl, hc, lc], axis=1).max(axis=1)
+                atr = tr.rolling(14).mean().iloc[-1]
+
+                # RSI и ADX
+                delta = df['c'].diff()
+                gain = (delta.where(delta > 0, 0)).rolling(14).mean()
+                loss = ((-delta).where(delta < 0, 0)).rolling(14).mean().replace(0, 0.0001)
+                rsi = 100 - (100 / (1 + gain / loss)).iloc[-1]
                 
-                avg_volume = df['v'].iloc[-21:-1].mean()
-                vol_ratio = df['v'].iloc[-1] / avg_volume if avg_volume > 0 else 0
+                # ADX (Сила тренда)
+                up, down = df['h'].diff(), df['l'].diff().shift(-1)
+                p_di = 100 * (pd.Series(np.where(up > 0, up, 0)).rolling(14).mean() / tr.rolling(14).mean())
+                m_di = 100 * (pd.Series(np.where(down > 0, down, 0)).rolling(14).mean() / tr.rolling(14).mean())
+                adx = (100 * (abs(p_di - m_di) / (p_di + m_di).replace(0, 0.1))).rolling(14).mean().iloc[-1]
 
-                # ЛОГИКА BUY
-                if prev_price > high_level and current_price > high_level and vol_ratio > 1.5:
-                    if current_price > ema_1h and current_adx > 25 and rsi < 70:
-                        print(f"!!! НАЙДЕН СИГНАЛ BUY: {symbol} !!!")
-                        sl = current_price - (current_atr * 2.5)
-                        tp = current_price + (current_atr * 5)
-                        threading.Thread(target=send_signal_with_chart, args=(symbol, df, "BUY", current_price, tp, sl, high_level)).start()
-                        last_signals[symbol] = current_time
+                # 3. Логика уровней и объёма
+                high_25 = df['c'].iloc[-26:-2].max()
+                low_25 = df['c'].iloc[-26:-2].min()
+                curr_c = df['c'].iloc[-1]
+                vol_ratio = df['v'].iloc[-1] / df['v'].iloc[-21:-1].mean()
 
-                # ЛОГИКА SELL
-                elif prev_price < low_level and current_price < low_level and vol_ratio > 1.5:
-                    if current_price < ema_1h and current_adx > 25 and rsi > 30:
-                        print(f"!!! НАЙДЕН СИГНАЛ SELL: {symbol} !!!")
-                        sl = current_price + (current_atr * 2.5)
-                        tp = current_price - (current_atr * 5)
-                        threading.Thread(target=send_signal_with_chart, args=(symbol, df, "SELL", current_price, tp, sl, low_level)).start()
-                        last_signals[symbol] = current_time
+                # 4. Проверка условий входа
+                # LONG
+                if curr_c > high_25 and vol_ratio > 2.0 and rsi < 60 and adx > 20:
+                    if curr_c > ema * 1.002:
+                        sl, tp = curr_c - (atr * 1.8), curr_c + (atr * 1.2)
+                        if time.time() - last_signals.get(symbol, 0) > 1800:
+                            threading.Thread(target=send_signal_with_chart, args=(symbol, df, "BUY", curr_c, tp, sl)).start()
+                            last_signals[symbol] = time.time()
+
+                # SHORT
+                elif curr_c < low_25 and vol_ratio > 2.0 and rsi > 40 and adx > 20:
+                    if curr_c < ema * 0.998:
+                        sl, tp = curr_c + (atr * 1.8), curr_c - (atr * 1.2)
+                        if time.time() - last_signals.get(symbol, 0) > 1800:
+                            threading.Thread(target=send_signal_with_chart, args=(symbol, df, "SELL", curr_c, tp, sl)).start()
+                            last_signals[symbol] = time.time()
 
             except Exception as e:
-                print(f"❌ Ошибка {symbol}: {e}")
+                print(f"⚠ Ошибка сканера {symbol}: {e}")
         
-        time.sleep(10)
-
+        time.sleep(20)
 if __name__ == "__main__":
     # Запускаем логику в отдельном потоке
     t = threading.Thread(target=breaker_logic, daemon=True)
