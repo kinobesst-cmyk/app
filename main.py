@@ -88,7 +88,7 @@ def breaker_logic():
         for symbol in SYMBOLS:
             try:
                current_time = time.time()
-                if current_time - last_signals.get(symbol, 0) < 600:
+               if current_time - last_signals.get(symbol, 0) < 600:
                     continue 
 
                 print(f">>> Проверяю {symbol}...") 
