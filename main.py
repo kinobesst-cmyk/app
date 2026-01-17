@@ -137,7 +137,7 @@ def breaker_logic():
     if __name__ == "__main__":
    
         # --- МГНОВЕННЫЙ ОБРАБОТЧИК КНОПКИ ---
-def fast_status_handler():
+    def fast_status_handler():
     last_id = 0
     # Сначала узнаем ID последнего сообщения, чтобы не отвечать на старые нажатия
     try:
