@@ -142,7 +142,7 @@ def fast_status_handler():
     last_id = 0
     # Быстрая очистка очереди при старте
     try:
-        r = requests.get(f"https://api.telegram.org/bot{TOKEN}/getUpdates", params={'offset': -1}, timeout=5).json()
+        r = requests.get(f"https://api.telegram.org/bot{TOKEN}/getUpdates", params={'offset': last_id + 1, 'timeout': 20}, timeout=25).json()
         if r.get("result"):
             last_id = r["result"][0]["update_id"]
     except: pass
