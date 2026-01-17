@@ -137,38 +137,25 @@ def breaker_logic():
 
             except Exception as e:
                 print(f"⚠ Ошибка {symbol}: {str(e)}")
-            # --- ПРОВЕРКА КНОПКИ СТАТУСА (БЕЗ ССЫЛОК И ВЕБХУКОВ) ---
-        try:
-            # Проверяем, нажимал ли ты кнопку (берем последнее сообщение)
-            upd_url = f"https://api.telegram.org/bot{TOKEN}/getUpdates"
-            resp = requests.get(upd_url, params={'offset': -1, 'limit': 1}, timeout=5).json()
-            
-            if resp.get("result"):
-                msg = resp["result"][0].get("message", {})
-                text = msg.get("text", "")
-                
-                if text == "📡 СТАТУС ПУШКИ":
-                    # Сразу отвечаем
-                    send_url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
-                    status_text = (
-                        "🚀 *ПУШКА НА БОЕВОМ ДЕЖУРСТВЕ*\n"
-                        "--------------------------\n"
-                        f"✅ Состояние: Работаю\n"
-                        f"⏱ Время: `{time.strftime('%H:%M:%S')}`\n"
-                        "🎯 Жду сигнал по математике..."
-                    )
-                    requests.post(send_url, json={
-                        "chat_id": CHAT_ID, 
-                        "text": status_text, 
-                        "parse_mode": "Markdown"
-                    })
-                    # Чтобы бот не отвечал на одно и то же нажатие дважды, "подтверждаем" прочтение
-                    requests.get(upd_url, params={'offset': resp["result"][0]["update_id"] + 1})
-        except:
-            pass
-            
+                        
         time.sleep(20)
 
 if __name__ == "__main__":
-    threading.Thread(target=breaker_logic, daemon=True).start()
+    # Запускаем МГНОВЕННЫЙ ответ на кнопку в отдельном потоке
+    def fast_status():
+        last_id = 0
+        while True:
+            try:
+                r = requests.get(f"https://api.telegram.org/bot{TOKEN}/getUpdates", params={'offset': last_id + 1, 'timeout': 5}).json()
+                if r.get("result"):
+                    for upd in r["result"]:
+                        last_id = upd["update_id"]
+                        if upd.get("message", {}).get("text") == "📡 СТАТУС ПУШКИ":
+                            requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", 
+                                          json={"chat_id": CHAT_ID, "text": f"✅ ПУШКА В СТРОЮ\n⏱ {time.strftime('%H:%M:%S')}"})
+            except: pass
+            time.sleep(1)
+
+    threading.Thread(target=fast_status, daemon=True).start() # "Уши" бота
+    threading.Thread(target=breaker_logic, daemon=True).start() # "Мозги" бота (твоя математика)
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8000)))
