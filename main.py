@@ -135,9 +135,12 @@ def breaker_logic():
         time.sleep(20)
 
 # --- МГНОВЕННЫЙ ОБРАБОТЧИК КНОПКИ ---
+time.sleep(1) # Короткая пауза между итерациями внутри цикла, если нужно
+
+# --- МГНОВЕННЫЙ ОБРАБОТЧИК КНОПКИ ---
 def fast_status_handler():
     last_id = 0
-    # Сначала узнаем ID последнего сообщения, чтобы не отвечать на старые нажатия
+    # Быстрая очистка очереди при старте
     try:
         r = requests.get(f"https://api.telegram.org/bot{TOKEN}/getUpdates", params={'offset': -1}, timeout=5).json()
         if r.get("result"):
@@ -146,9 +149,9 @@ def fast_status_handler():
 
     while True:
         try:
-            # Опрашиваем ТГ без задержки (timeout=0), ответ будет мгновенным
+            # Long Polling: timeout=0 позволяет проверять мгновенно
             r = requests.get(f"https://api.telegram.org/bot{TOKEN}/getUpdates", 
-                             params={'offset': last_id + 1, 'timeout': 0}, timeout=5).json()
+                             params={'offset': last_id + 1, 'timeout': 0}, timeout=10).json()
             if r.get("result"):
                 for upd in r["result"]:
                     last_id = upd["update_id"]
@@ -157,13 +160,13 @@ def fast_status_handler():
                         status_msg = f"✅ *ПУШКА В СТРОЮ*\n⏱ `{time.strftime('%H:%M:%S')}`\n🚀 Мониторинг 12 пар активен!"
                         requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", 
                                       json={"chat_id": CHAT_ID, "text": status_msg, "parse_mode": "Markdown"})
-        except Exception as e:
-            time.sleep(2)
-        time.sleep(0.5) # Проверка 2 раза в секунду
+        except Exception:
+            time.sleep(1)
+        time.sleep(0.1) # Минимальная задержка для мгновенной реакции
 
 # --- ЗАПУСК ---
 if __name__ == "__main__":
-    # 1. Сразу шлем кнопку в чат
+    # 1. Сначала шлем кнопку (это даст сигнал в ТГ, что бот ожил)
     try:
         requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", json={
             "chat_id": CHAT_ID,
@@ -172,9 +175,12 @@ if __name__ == "__main__":
         })
     except: pass
 
-    # 2. Запускаем быстрые ответы и логику сканера в разных потоках
-    threading.Thread(target=fast_status_handler, daemon=True).start()
-    threading.Thread(target=breaker_logic, daemon=True).start()
+    # 2. ЗАПУСКАЕМ ПОТОКИ (daemon=True позволяет им не блокировать Flask)
+    t1 = threading.Thread(target=fast_status_handler, daemon=True)
+    t2 = threading.Thread(target=breaker_logic, daemon=True)
     
-    # 3. Держим Flask для Koyeb
-    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8000)))
+    t1.start()
+    t2.start()
+    
+    # 3. Flask — запускается последним и работает как главный процесс
+    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8000)), debug=False, use_reloader=False)
