@@ -142,35 +142,47 @@ def breaker_logic():
         time.sleep(20)
 
 if __name__ == "__main__":
-    # Функция для мгновенного ответа
-    def fast_status():
-        # СНАЧАЛА ОЧИЩАЕМ ОЧЕРЕДЬ (чтобы бот не отвечал на старые нажатия)
-        last_id = 0
+   # --- МГНОВЕННЫЙ ОБРАБОТЧИК КНОПКИ ---
+def fast_status_handler():
+    last_id = 0
+    # Сначала узнаем ID последнего сообщения, чтобы не отвечать на старые нажатия
+    try:
+        r = requests.get(f"https://api.telegram.org/bot{TOKEN}/getUpdates", params={'offset': -1}, timeout=5).json()
+        if r.get("result"):
+            last_id = r["result"][0]["update_id"]
+    except: pass
+
+    while True:
         try:
-            r = requests.get(f"https://api.telegram.org/bot{TOKEN}/getUpdates", params={'offset': -1}).json()
+            # Опрашиваем ТГ без задержки (timeout=0), ответ будет мгновенным
+            r = requests.get(f"https://api.telegram.org/bot{TOKEN}/getUpdates", 
+                             params={'offset': last_id + 1, 'timeout': 0}, timeout=5).json()
             if r.get("result"):
-                last_id = r["result"][0]["update_id"]
-        except: pass
+                for upd in r["result"]:
+                    last_id = upd["update_id"]
+                    msg = upd.get("message", {})
+                    if msg.get("text") == "📡 СТАТУС ПУШКИ":
+                        status_msg = f"✅ *ПУШКА В СТРОЮ*\n⏱ `{time.strftime('%H:%M:%S')}`\n🚀 Мониторинг 12 пар активен!"
+                        requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", 
+                                      json={"chat_id": CHAT_ID, "text": status_msg, "parse_mode": "Markdown"})
+        except Exception as e:
+            time.sleep(2)
+        time.sleep(0.5) # Проверка 2 раза в секунду
 
-        while True:
-            try:
-                # Опрашиваем без долгого ожидания (timeout=0), чтобы не вешать поток
-                r = requests.get(f"https://api.telegram.org/bot{TOKEN}/getUpdates", 
-                                 params={'offset': last_id + 1, 'timeout': 0}, timeout=5).json()
-                if r.get("result"):
-                    for upd in r["result"]:
-                        last_id = upd["update_id"]
-                        msg = upd.get("message", {})
-                        if msg.get("text") == "📡 СТАТУС ПУШКИ":
-                            requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", 
-                                          json={"chat_id": CHAT_ID, "text": f"✅ ПУШКА В СТРОЮ\n⏱ {time.strftime('%H:%M:%S')}"})
-            except: 
-                pass
-            time.sleep(0.5) # Проверка дважды в секунду — это и есть "мгновенно"
+# --- ЗАПУСК ---
+if __name__ == "__main__":
+    # 1. Сразу шлем кнопку в чат
+    try:
+        requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", json={
+            "chat_id": CHAT_ID,
+            "text": "🎮 Панель управления активирована",
+            "reply_markup": {"keyboard": [[{"text": "📡 СТАТУС ПУШКИ"}]], "resize_keyboard": True}
+        })
+    except: pass
 
-    # Запуск потоков
-    threading.Thread(target=fast_status, daemon=True).start()
+    # 2. Запускаем быстрые ответы и логику сканера в разных потоках
+    threading.Thread(target=fast_status_handler, daemon=True).start()
     threading.Thread(target=breaker_logic, daemon=True).start()
     
-    # Запуск сервера для Koyeb
+    # 3. Держим Flask для Koyeb
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8000)))
