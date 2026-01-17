@@ -140,9 +140,10 @@ if __name__ == "__main__":
 # Функция должна стоять вплотную к левому краю
 # --- МГНОВЕННЫЙ ОБРАБОТЧИК КНОПКИ ---
 # --- ФУНКЦИЯ ОБРАБОТКИ КНОПКИ (Твой "Живой?") ---
+# --- АНАЛОГ ТВОЕГО @bot.message_handler (Слушатель кнопки) ---
 def fast_status_handler():
     last_id = 0
-    # Сбрасываем старые сообщения при старте
+    # Сброс старых нажатий (чтобы не отвечал на то, что было 10 минут назад)
     try:
         r = requests.get(f"https://api.telegram.org/bot{TOKEN}/getUpdates", params={'offset': -1}, timeout=5).json()
         if r.get("result"):
@@ -151,25 +152,23 @@ def fast_status_handler():
 
     while True:
         try:
-            # Проверяем новые сообщения
+            # Бот постоянно "спрашивает" Telegram: "Нажали кнопку?"
             r = requests.get(f"https://api.telegram.org/bot{TOKEN}/getUpdates", 
                              params={'offset': last_id + 1, 'timeout': 0}, timeout=5).json()
             if r.get("result"):
                 for upd in r["result"]:
                     last_id = upd["update_id"]
-                    msg_text = upd.get("message", {}).get("text")
-                    
-                    # Логика как в твоем примере:
-                    if msg_text == "📡 СТАТУС ПУШКИ":
+                    # Если текст сообщения совпадает с кнопкой:
+                    if upd.get("message", {}).get("text") == "📡 СТАТУС ПУШКИ":
+                        # МГНОВЕННЫЙ ОТВЕТ (как в твоем примере "Да, тружусь")
                         requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", 
-                                      json={"chat_id": CHAT_ID, 
-                                            "text": f"✅ Да, тружусь, всё хорошо!\n⏱ {time.strftime('%H:%M:%S')}"})
+                                      json={"chat_id": CHAT_ID, "text": "✅ Да, тружусь, всё хорошо!"})
         except: pass
-        time.sleep(0.5)
+        time.sleep(0.5) # Пауза полсекунды, чтобы не перегружать процессор
 
-# --- БЛОК ЗАПУСКА ---
+# --- ГЛАВНЫЙ ЗАПУСК (Твой аналог start) ---
 if __name__ == "__main__":
-    # 1. Сразу активируем кнопку (Твой 'start')
+    # Выводим кнопку в интерфейс
     try:
         requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", json={
             "chat_id": CHAT_ID,
@@ -178,9 +177,11 @@ if __name__ == "__main__":
         })
     except: pass
 
-    # 2. Запускаем параллельную работу
-    threading.Thread(target=fast_status_handler, daemon=True).start() # Слушает кнопку
-    threading.Thread(target=breaker_logic, daemon=True).start()      # Считает монеты
+    # Запускаем два независимых процесса:
+    # 1. Слушатель кнопки (отвечает мгновенно)
+    threading.Thread(target=fast_status_handler, daemon=True).start()
+    # 2. Твоя математика (считает монеты)
+    threading.Thread(target=breaker_logic, daemon=True).start()
     
-    # 3. Flask для Koyeb
+    # Flask для Koyeb
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8000)))
