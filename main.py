@@ -137,25 +137,47 @@ def breaker_logic():
 if __name__ == "__main__":
    
         # --- МГНОВЕННЫЙ ОБРАБОТЧИК КНОПКИ ---
+# --- МГНОВЕННЫЙ ОБРАБОТЧИК КНОПКИ ---
 def fast_status_handler():
     last_id = 0
+    # Сначала узнаем ID последнего сообщения, чтобы не отвечать на старые нажатия
     try:
         r = requests.get(f"https://api.telegram.org/bot{TOKEN}/getUpdates", params={'offset': -1}, timeout=5).json()
-        if r.get("result"): last_id = r["result"][0]["update_id"]
+        if r.get("result"):
+            last_id = r["result"][0]["update_id"]
     except: pass
+
     while True:
         try:
-            r = requests.get(f"https://api.telegram.org/bot{TOKEN}/getUpdates", params={'offset': last_id + 1, 'timeout': 0}, timeout=5).json()
+            # Опрашиваем ТГ без задержки (timeout=0), ответ будет мгновенным
+            r = requests.get(f"https://api.telegram.org/bot{TOKEN}/getUpdates", 
+                             params={'offset': last_id + 1, 'timeout': 0}, timeout=5).json()
             if r.get("result"):
                 for upd in r["result"]:
                     last_id = upd["update_id"]
-                    if upd.get("message", {}).get("text") == "📡 СТАТУС ПУШКИ":
+                    msg = upd.get("message", {})
+                    if msg.get("text") == "📡 СТАТУС ПУШКИ":
+                        status_msg = f"✅ *ПУШКА В СТРОЮ*\n⏱ `{time.strftime('%H:%M:%S')}`\n🚀 Мониторинг 12 пар активен!"
                         requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", 
-                                      json={"chat_id": CHAT_ID, "text": f"✅ *ПУШКА В СТРОЮ*\n⏱ `{time.strftime('%H:%M:%S')}`", "parse_mode": "Markdown"})
-        except: pass
-        time.sleep(0.5)
+                                      json={"chat_id": CHAT_ID, "text": status_msg, "parse_mode": "Markdown"})
+        except Exception as e:
+            time.sleep(2)
+        time.sleep(0.5) # Проверка 2 раза в секунду
 
+# --- ЗАПУСК ---
 if __name__ == "__main__":
+    # 1. Сразу шлем кнопку в чат
+    try:
+        requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", json={
+            "chat_id": CHAT_ID,
+            "text": "🎮 Панель управления активирована",
+            "reply_markup": {"keyboard": [[{"text": "📡 СТАТУС ПУШКИ"}]], "resize_keyboard": True}
+        })
+    except: pass
+
+    # 2. Запускаем быстрые ответы и логику сканера в разных потоках
     threading.Thread(target=fast_status_handler, daemon=True).start()
     threading.Thread(target=breaker_logic, daemon=True).start()
+    
+    # 3. Держим Flask для Koyeb
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8000)))
