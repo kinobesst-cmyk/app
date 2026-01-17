@@ -71,13 +71,6 @@ def breaker_logic():
             print(f"❌ ТЕЛЕГРАМ ОШИБКА: {test_res.status_code} - {test_res.text}")
     except Exception as e:
         print(f"❌ КРИТИЧЕСКАЯ ОШИБКА СВЯЗИ: {e}")
-
-        # Активируем кнопку в твоем Telegram
-    requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", json={
-        "chat_id": CHAT_ID,
-        "text": "🎮 Панель управления активирована",
-        "reply_markup": {"keyboard": [[{"text": "📡 СТАТУС ПУШКИ"}]], "resize_keyboard": True}
-    })
     
     while True:
         print(f"\n--- НОВЫЙ КРУГ ПРОВЕРКИ: {time.strftime('%H:%M:%S')} ---")
