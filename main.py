@@ -138,6 +138,7 @@ if __name__ == "__main__":
    
 # --- МГНОВЕННЫЙ ОБРАБОТЧИК КНОПКИ ---
 # Функция должна стоять вплотную к левому краю
+# --- МГНОВЕННЫЙ ОБРАБОТЧИК КНОПКИ ---
 def fast_status_handler():
     last_id = 0
     # Сначала узнаем ID последнего сообщения, чтобы не отвечать на старые нажатия
@@ -165,9 +166,8 @@ def fast_status_handler():
         time.sleep(0.5) # Проверка 2 раза в секунду
 
 # --- ЗАПУСК ---
-# Этот блок тоже стоит вплотную к левому краю
 if __name__ == "__main__":
-    # 1. Сразу шлем кнопку в чат (ОТСТУП 4 ПРОБЕЛА)
+    # 1. Сразу шлем кнопку в чат
     try:
         requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", json={
             "chat_id": CHAT_ID,
@@ -176,9 +176,9 @@ if __name__ == "__main__":
         })
     except: pass
 
-    # 2. Запускаем быстрые ответы и логику сканера в разных потоках (ОТСТУП 4 ПРОБЕЛА)
+    # 2. Запускаем быстрые ответы и логику сканера в разных потоках
     threading.Thread(target=fast_status_handler, daemon=True).start()
     threading.Thread(target=breaker_logic, daemon=True).start()
     
-    # 3. Держим Flask для Koyeb (ОТСТУП 4 ПРОБЕЛА)
+    # 3. Держим Flask для Koyeb
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8000)))
